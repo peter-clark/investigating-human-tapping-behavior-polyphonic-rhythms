@@ -3,10 +3,7 @@
 import os
 
 import pip
-try:
-	import mido
-except ImportError:
-	pip.main(['install', 'mido'])
+import mido
 from pathlib import Path
 import numpy as np
 from sklearn.metrics import pairwise_distances
