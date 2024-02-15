@@ -1,13 +1,13 @@
 # functions for making rhythmspaces
 
 import os
+
 import pip
-def import_or_install(package):
-    try:
-        __import__(package)
-    except ImportError:
-        pip.main(['install', package])
-import_or_install('mido')
+try:
+	import mido
+except ImportError:
+	pip.main(['install', 'mido'])
+
 from pathlib import Path
 import numpy as np
 from sklearn.metrics import pairwise_distances
