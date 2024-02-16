@@ -66,46 +66,46 @@ def flat(pattern, density_type, meter, syncopation_type):
 #### Onset Density / Meter / Syncopation
     if density_type == 0: 
         patt_LMH = np.sum(pattern_LMH, axis=1)/np.max(np.sum(pattern_LMH, axis=1))
-
+        for note in range(len(pattern)):
+            output_pattern[note] += patt_LMH[note]
         if meter == 1: # basic meter
             for note in range(len(pattern)):
-                if np.any(pattern_LMH[note][n]>0 for n in pattern_LMH[note]):
+                if np.any(pattern_LMH[note][n]>0.0 for n in pattern_LMH[note]):
                     output_pattern[note] += meter_strength[note]*patt_LMH[note]
         
         if syncopation_type == 1: # mono sync
             for note in range(len(pattern)):
                 if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync
-                    if np.any(pattern_LMH[note][x]>0 and pattern_LMH[(note+1)%len(pattern)][x]==0 for x in range(3)): 
+                    if np.any(pattern_LMH[note][x]>0.0 and pattern_LMH[(note+1)%len(pattern)][x]==0.0 for x in range(3)): 
                         output_pattern[note] += sync_strength[note]*patt_LMH[note] # add to one sync value if any channel is sync
-
-        
-        elif meter==0 and syncopation_type==0: # just onset density
-            for note in range(len(pattern)):
-                output_pattern[note] += np.sum(patt_LMH, axis=0)
+            
 #-----------------------------------------------------------------------------------------------
 # [1]
 #### Frequency Weighted Onset Density
     if density_type == 1:
         patt_LMH = pattern_LMH
-        patt_LMH[:][0] *= 3 # low x3 weight
-        patt_LMH[:][1] *= 2 # mid x2 weight
+        for note in range(16):
+            patt_LMH[note][0] *= 3.0 # low x3 weight
+            patt_LMH[note][1] *= 2.0 # mid x2 weight
         step_values = np.sum(patt_LMH, axis=0) / np.max(np.sum(patt_LMH, axis=0))
-        # now we have value per step
+        patt_LMH = np.sum(pattern_LMH, axis=1)/np.max(np.sum(pattern_LMH, axis=1))
+        
+        for note in range(len(pattern)): # freq weig ons den
+            for n in range(3):
+                if pattern_LMH[note][n]>0.01:
+                    output_pattern[note] += pattern_LMH[note][n]*step_values[n]
 
         if meter == 1: # basic meter
             for note in range(len(pattern)):
                 for n in range(3):
-                    output_pattern[note] += meter_strength[note]*step_values[n]
-    
+                    output_pattern[note] += meter_strength[note]*output_pattern[note]
         if syncopation_type == 1: # basic sync
             for note in range(len(pattern)):
-                for n in range(len(patt_LMH[note])):
-                    if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync pos
-                        if patt_LMH[note][n]>0 and patt_LMH[(note+1)%len(pattern)][n]==0: # if sync note
-                            output_pattern[note] += sync_strength[note]*patt_LMH[note][n] # add notexweighted value
+                for n in range(3):
+                    if sync_strength[note]>sync_strength[(note)%16]: # if sync pos
+                        if patt_LMH[note][n]>0.0 and patt_LMH[(note)%len(pattern)][n]<0.01: # if sync note
+                            output_pattern[note] += sync_strength[note]*step_values[n] # add notexweighted value
         
-        elif meter==0 and syncopation_type==0:
-            output_pattern += np.sum(patt_LMH, axis=1)
 
 #-------------------------------------------------------------------------------------------
 # [2]                            
@@ -114,12 +114,17 @@ def flat(pattern, density_type, meter, syncopation_type):
         patt_LMH = pattern_LMH
         salience = np.array([0.0, 0.0, 0.0], dtype=float)
         num_notes_channel = np.sum(patt_LMH, axis=0)
-        num_notes = np.sum(patt_LMH)
+        num_notes = np.sum(num_notes_channel)
         rel_dens = np.array(num_notes_channel / num_notes, dtype=float)
-        salience = 1/rel_dens
+        salience = [1.0/x if x>0.0 else 0.0 for x in rel_dens]
         channel_values = salience / np.sum(salience)
-
         # now we have value per step
+
+        #patt_LMH = np.sum(pattern_LMH, axis=1)/np.max(np.sum(pattern_LMH, axis=1))
+        for note in range(len(pattern)): # freq weig ons den
+            for n in range(3):
+                if pattern_LMH[note][n]>0.01:
+                    output_pattern[note] += pattern_LMH[note][n]*channel_values[n]
 
         if meter == 1: # basic meter
             for note in range(len(pattern)):
@@ -130,13 +135,9 @@ def flat(pattern, density_type, meter, syncopation_type):
             for note in range(len(pattern)):
                 for n in range(len(patt_LMH[note])):
                     if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync pos
-                        if patt_LMH[note][n]>0 and patt_LMH[(note+1)%len(pattern)][n]==0: # if sync note
+                        if patt_LMH[note][n]>0.0 and patt_LMH[(note+1)%len(pattern)][n]==0.0: # if sync note
                             output_pattern[note] += sync_strength[note]*(patt_LMH[note][n]*channel_values[n]) # add note x sal.weighted value
-  
-        elif meter==0 and syncopation_type==0:
-            for n in range(len(pattern)):
-                patt_LMH *= channel_values
-            output_pattern += np.sum(patt_LMH[n][:], axis=0)
+                    
 
 #-------------------------------------------------------------------------------------------
 # [3]                            
@@ -153,7 +154,7 @@ def flat(pattern, density_type, meter, syncopation_type):
         if syncopation_type == 1: # basic sync
             for note in range(len(pattern)):
                 if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync pos
-                    if mono_patt[note]>0 and mono_patt[(note+1)%len(pattern)]==0: # if sync note
+                    if mono_patt[note]>0.0 and mono_patt[(note+1)%len(pattern)]==0: # if sync note
                         output_pattern[note] += sync_strength[note]
         if syncopation_type == 2: # polysync
             #print("TODO: poly sync")

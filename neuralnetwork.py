@@ -94,9 +94,11 @@ device = (
 )
 print(f"Using {device} device")
 
-def build_model(len_pattern=16,firstlayer=32,secondlayer=32,thirdlayer=16,fourthlayer=16,coords=2):
-    #model = FC_FF_NN_3LAYER(len_pattern,firstlayer,secondlayer,thirdlayer,coords).to(device)
-    model = FC_FF_NN_4LAYER(len_pattern,firstlayer,secondlayer,thirdlayer,fourthlayer,coords).to(device)
+def build_model(len_pattern=16,firstlayer=32,secondlayer=32,thirdlayer=16,fourthlayer=16,coords=2, model_layers=4):
+    if model_layers==3:
+        model = FC_FF_NN_3LAYER(len_pattern,firstlayer,secondlayer,thirdlayer,coords).to(device)
+    elif model_layers==4:
+        model = FC_FF_NN_4LAYER(len_pattern,firstlayer,secondlayer,thirdlayer,fourthlayer,coords).to(device)
     return model
 
 def load_model(model_dir):
