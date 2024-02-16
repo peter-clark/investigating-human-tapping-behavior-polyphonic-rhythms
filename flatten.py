@@ -3,25 +3,6 @@ import numpy as np
 import descriptors as desc
 import re
 
-def parse(line):
-    line = str(line)
-    regex = r"[-+]?\d*\.\d+|\d" # searches for all floats or integers
-    list = re.findall(regex, line)
-    output = [float(x) for x in list]
-    return output
-
-def is_Max(current_max_num, num):
-    return num if(num>current_max_num)else current_max_num
-
-## Normalize a 4x16-step pattern of velocity values
-def normalize_velocity(patterns, max_in_pattern):
-    for i in range(2):
-        for j in range(len(patterns[i])):
-                patterns[i][j] = patterns[i][j]/max_in_pattern[0]
-                patterns[i+2][j] = patterns[i+2][j]/max_in_pattern[1]
-    means = [np.sum(patterns[0])/len(patterns[0]), np.sum(patterns[2])/len(patterns[2])]
-    return patterns, means
-
 ## Finds approriate frequency channel for midi note
 def find_LMH(note):
     if(int(note)==0):
@@ -46,118 +27,8 @@ def get_LMH(pattern):
         pattern_LMH.append(lmh)
     return pattern_LMH
 
-
-## Input: pattern of 8-instrument midi notes in array of 16 steps
-## Output: four flattened representations in array (2 continous, 2 discrete)
-def flat_from_patt(pattern):
-    # Initialize variables
-    pattern_LMH = get_LMH(pattern) # LOW MID HIGH
-    pattern_LMH_count=[[0 for x in range(len(pattern_LMH))] for y in range(3)]
-    total_count = [0.0 for x in range(4)]
-    flattened_patterns = [[0.0 for x in range(len(pattern_LMH))]for y in range(6)]
-    true_sync_salience = [5,1,2,1, 3,1,2,1, 4,1,2,1, 3,1,2,1]
-    metric_sal_strength = [4,0,1,0, 2,0,1,0, 3,0,1,0, 2,0,1,0]
-    sync_strength = [0,1,0,2, 0,1,0,3, 0,1,0,2, 0,1,0,4]
-    #sync_strength = [0,4,0,1, 0,2,0,1, 0,3,0,1, 0,2,0,1]
-
-    # Count multi-hits in same channel on step
-    for i in range(len(pattern_LMH)):
-        for j in range(len(pattern_LMH[i])):
-            pattern_LMH_count[0][i] += 1 if pattern_LMH[i][j]==1 else 0 # LOW
-            pattern_LMH_count[1][i] += 1 if pattern_LMH[i][j]==2 else 0 # MID
-            pattern_LMH_count[2][i] += 1 if pattern_LMH[i][j]==3 else 0 # HIGH
-    for i in range(3): # GET TOTAL COUNT
-        total_count[i] = float(np.sum(pattern_LMH_count[i]))
-        total_count[3] += float(np.sum(pattern_LMH_count[i]))
-
-    # Initialize variables for flattening
-    density = [0.0 for x in range(3)]
-    salience = [0.0 for x in range(4)]
-    norm_salience = [0.0 for x in range(3)]
-    means = [0.0,0.0]
-    maxes = [0.0,0.0]
-    for i in range(3):
-        density[i] = 0.0 if total_count[3]==0 else float(total_count[i]/total_count[3])
-        salience[i] = 0.0 if density[i]<=0.0 else float(1/density[i])
-        salience[3] += salience[i]
-    for i in range(3):
-        norm_salience[i] = salience[i]/salience[3]
-
-
-    # Testing other onset density method
-    norm_salience = [3.0,2.0,1.0]
-    #tmp = np.array([3.0,2.0,1.0], dtype=float)
-    #for i in range(3):
-    #    norm_salience[i] *= tmp
-
-    # Loop through pattern
-    for i in range(len(pattern_LMH)):
-        if(pattern_LMH_count[0][i]>0 or pattern_LMH_count[1][i]>0 or pattern_LMH_count[2][i]>0):
-            note_values = [norm_salience[0]*pattern_LMH_count[0][i],norm_salience[1]*pattern_LMH_count[1][i],norm_salience[2]*pattern_LMH_count[2][i]]
-            note_values_density_sync = [note_values[0],note_values[1],note_values[2]]
-            note_values_density_sync_meter = [note_values[0],note_values[1],note_values[2]]
-
-            ## FLATTENING ALGORITHMS
-            # [1] Normalized Density Salience and Syncopation Strength
-            if i>0:
-                if(i<len(pattern_LMH)):
-                    if(true_sync_salience[i-1]>true_sync_salience[i]): # if note is syncop
-                        if(pattern_LMH_count[0][i-1]==0):
-                            note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                        if(pattern_LMH_count[1][i-1]==0):
-                            note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                        if(pattern_LMH_count[2][i-1]==0):
-                            note_values_density_sync[2] += (note_values[2]*sync_strength[i])
-            """ if(i<len(pattern_LMH)-1):
-                if(true_sync_salience[i]>true_sync_salience[i+1]): # if note is syncop
-                    if(pattern_LMH_count[0][i+1]==0):
-                        note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                    if(pattern_LMH_count[1][i+1]==0):
-                        note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                    if(pattern_LMH_count[2][i+1]==0):
-                        note_values_density_sync[2] += (note_values[2]*sync_strength[i])
-            if(i==len(pattern_LMH)-1):
-                    if(pattern_LMH_count[0][0]==0):
-                        note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                    if(pattern_LMH_count[1][0]==0):
-                        note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                    if(pattern_LMH_count[2][0]==0):
-                        note_values_density_sync[2] += (note_values[2]*sync_strength[i]) """
-            flattened_patterns[0][i] = np.sum(note_values_density_sync)
-            flattened_patterns[1][i] = np.sum(note_values_density_sync)
-            means[0] += np.sum(note_values_density_sync)
-            maxes[0] = is_Max(maxes[0], np.sum(note_values_density_sync))
-
-            # [2] Normalized Density Salience, Metric Salience, Syncopation Strength
-            if(i<len(pattern_LMH)-1):
-                if(metric_sal_strength[i]>metric_sal_strength[i+1]): # if meter is reinforced
-                    if(pattern_LMH_count[0][i+1]==0):
-                        note_values_density_sync_meter[0] += (note_values[0]*metric_sal_strength[i])
-                    if(pattern_LMH_count[1][i+1]==0):
-                        note_values_density_sync_meter[1] += (note_values[1]*metric_sal_strength[i])
-                    if(pattern_LMH_count[2][i+1]==0):
-                        note_values_density_sync_meter[2] += (note_values[2]*metric_sal_strength[i])
-
-            note_values_density_sync_meter[0] += (note_values_density_sync[0])
-            note_values_density_sync_meter[1] += (note_values_density_sync[1])
-            note_values_density_sync_meter[2] += (note_values_density_sync[2])
-            flattened_patterns[2][i] = np.sum(note_values_density_sync_meter)
-            flattened_patterns[3][i] = np.sum(note_values_density_sync_meter)
-            means[1] += np.sum(note_values_density_sync_meter)
-            maxes[1] = is_Max(maxes[1], np.sum(note_values_density_sync_meter))
-    flattened_patterns, means = normalize_velocity(flattened_patterns, maxes)
-
-    # Convert to boolean/discrete once for each algorithm
-    for step in range(len(pattern_LMH)):
-        flattened_patterns[1][step]=1 if flattened_patterns[1][step]>=means[0] else 0
-        flattened_patterns[3][step]=1 if flattened_patterns[3][step]>=means[1] else 0
-        flattened_patterns[4][step]=flattened_patterns[0][step] if flattened_patterns[1][step]==1 else 0
-        flattened_patterns[5][step]=flattened_patterns[2][step] if flattened_patterns[3][step]==1 else 0
-
-    return flattened_patterns
-
-def get_lmh_counts(pattern):
-    pattern_LMH = get_LMH(pattern) # LOW MID HIGH
+def lmh_counts(pattern):
+    pattern_LMH = pattern # LOW MID HIGH
     pattern_LMH_count=[[0 for x in range(len(pattern_LMH))] for y in range(3)]
      # Count multi-hits in same channel on step
     for i in range(len(pattern_LMH)):
@@ -168,370 +39,130 @@ def get_lmh_counts(pattern):
     return pattern_LMH_count
 
 
-def onset_density(pattern):
-    arr = np.array([0.0 for x in range(16)], dtype=float)
 
-    pattern_LMH_count = get_lmh_counts(pattern)
-    pattern_LMH_count = np.array(pattern_LMH_count, dtype=float)
 
-    arr = np.sum(pattern_LMH_count, axis=0) / np.max(np.sum(pattern_LMH_count, axis=0)) # Normalize
-    return arr
+#-----------------------------------------------------------------------------------------------#
+#----------------------------------Flattening Algorithms----------------------------------------#
+#-----------------------------------------------------------------------------------------------#
 
-def witek_scaling(pattern):
-    arr = np.array([0.0 for x in range(16)], dtype=float)
-    
-    pattern_LMH_count = get_lmh_counts(pattern)
-    pattern_LMH_count = np.array(pattern_LMH_count, dtype=float)
-    
-    # scale by 3/2/1
-    pattern_LMH_count[0] *= 3 # low
-    pattern_LMH_count[1] *= 2 # mid
+def flat(pattern, density_type, meter, syncopation_type):
+    ## density types:
+    # 0 := onset density, 1 := weighted. density, 2 := rel. density, 3 := note presence
+    ## sync types:
+    # 0 := none, 1 := sync, 2 := polysync
+    ## meter:
+    # 0 := none, 1 := GTTM
+    # final normalization done at end of function
 
-    arr = np.sum(pattern_LMH_count, axis=0) / np.max(np.sum(pattern_LMH_count, axis=0)) # Normalize
-    #print(arr.shape)
-    return arr
+    output_pattern = np.array([0.0 for x in range(len(pattern))])
+    pattern_LMH = np.array(lmh_counts(pattern), dtype=float) # get # in each channel
+    pattern_LMH = np.transpose(pattern_LMH)
+    step_values = np.array([0.0, 0.0, 0.0], dtype=float)
 
-## These were forward syncopations (preceding the high meter rest)
-## They are currently backwards syncopations (after) and perform better than the forwards ones.
-def syncopation(pattern, type):
-    arr = np.array([0.0 for x in range(16)], dtype=float)
-    pattern_LMH_count = get_lmh_counts(pattern)
-    pattern_LMH_count = np.array(pattern_LMH_count, dtype=float)
-
-    true_sync_salience = [5,1,2,1, 3,1,2,1, 4,1,2,1, 3,1,2,1]
     sync_strength = [0,1,0,2, 0,1,0,3, 0,1,0,2, 0,1,0,4]
-    #sync_strength = [0,4,0,1, 0,2,0,1, 0,3,0,1, 0,2,0,1]
+    meter_strength = [4,0,1,0, 2,0,1,0, 3,0,1,0, 2,0,1,0]
+#-----------------------------------------------------------------------------------------------
+# [0]
+#### Onset Density / Meter / Syncopation
+    if density_type == 0: 
+        patt_LMH = np.sum(pattern_LMH, axis=1)/np.max(np.sum(pattern_LMH, axis=1))
 
+        if meter == 1: # basic meter
+            for note in range(len(pattern)):
+                if np.any(pattern_LMH[note][n]>0 for n in pattern_LMH[note]):
+                    output_pattern[note] += meter_strength[note]*patt_LMH[note]
+        
+        if syncopation_type == 1: # mono sync
+            for note in range(len(pattern)):
+                if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync
+                    if np.any(pattern_LMH[note][x]>0 and pattern_LMH[(note+1)%len(pattern)][x]==0 for x in range(3)): 
+                        output_pattern[note] += sync_strength[note]*patt_LMH[note] # add to one sync value if any channel is sync
 
-    for i in range(16):
-        # Code from sync part of flattening algorithm above
-        if(pattern_LMH_count[0][i]>0 or pattern_LMH_count[1][i]>0 or pattern_LMH_count[2][i]>0):
-            note_values = [pattern_LMH_count[0][i], pattern_LMH_count[1][i], pattern_LMH_count[2][i]]
-            for note in range(len(note_values)): # this loop removes multi hits
-                if note_values[note]>=1:
-                    note_values[note] = np.min([note_values[note], 1])
-            note_values_density_sync = [note_values[0],note_values[1],note_values[2]]
+        
+        elif meter==0 and syncopation_type==0: # just onset density
+            for note in range(len(pattern)):
+                output_pattern[note] += np.sum(patt_LMH, axis=0)
+#-----------------------------------------------------------------------------------------------
+# [1]
+#### Frequency Weighted Onset Density
+    if density_type == 1:
+        patt_LMH = pattern_LMH
+        patt_LMH[:][0] *= 3 # low x3 weight
+        patt_LMH[:][1] *= 2 # mid x2 weight
+        step_values = np.sum(patt_LMH, axis=0) / np.max(np.sum(patt_LMH, axis=0))
+        # now we have value per step
 
-            if i>0:
-                if(i<len(pattern_LMH_count)):
-                    if(true_sync_salience[i-1]>true_sync_salience[i]): # if note is syncop
-                        if(pattern_LMH_count[0][i-1]==0):
-                            note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                        if(pattern_LMH_count[1][i-1]==0):
-                            note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                        if(pattern_LMH_count[2][i-1]==0):
-                            note_values_density_sync[2] += (note_values[2]*sync_strength[i])
-            """ if(i<15):
-                if(true_sync_salience[i]>true_sync_salience[i+1]): # if note is syncop
-                    if(pattern_LMH_count[0][i+1]==0):
-                        note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                    if(pattern_LMH_count[1][i+1]==0):
-                        note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                    if(pattern_LMH_count[2][i+1]==0):
-                        note_values_density_sync[2] += (note_values[2]*sync_strength[i])
-            if(i==15):
-                    if(pattern_LMH_count[0][0]==0):
-                        note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                    if(pattern_LMH_count[1][0]==0):
-                        note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                    if(pattern_LMH_count[2][0]==0):
-                        note_values_density_sync[2] += (note_values[2]*sync_strength[i]) """
-            if type==2:
-                note_values_density_sync[0] *= 3 # low
-                note_values_density_sync[1] *= 2 # mid
-            arr[i] = np.sum(note_values_density_sync)
+        if meter == 1: # basic meter
+            for note in range(len(pattern)):
+                for n in range(3):
+                    output_pattern[note] += meter_strength[note]*step_values[n]
     
-    arr /= np.max(arr) # Normalize
-    return arr
+        if syncopation_type == 1: # basic sync
+            for note in range(len(pattern)):
+                for n in range(len(patt_LMH[note])):
+                    if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync pos
+                        if patt_LMH[note][n]>0 and patt_LMH[(note+1)%len(pattern)][n]==0: # if sync note
+                            output_pattern[note] += sync_strength[note]*patt_LMH[note][n] # add notexweighted value
+        
+        elif meter==0 and syncopation_type==0:
+            output_pattern += np.sum(patt_LMH, axis=1)
 
-def witek_syncopation(pattern, type):
-    arr = np.array([0.0 for x in range(16)], dtype=float)
-    pattern_LMH_count = get_lmh_counts(pattern)
-    pattern_LMH_count = np.array(pattern_LMH_count, dtype=float)
-    true_sync_salience = [5,1,2,1, 3,1,2,1, 4,1,2,1, 3,1,2,1]
-    sync_strength = [0,1,0,2, 0,1,0,3, 0,1,0,2, 0,1,0,4] #f 
-    #sync_strength = [0,4,0,1, 0,2,0,1, 0,3,0,1, 0,2,0,1] #b
+#-------------------------------------------------------------------------------------------
+# [2]                            
+#### Pattern Relative Onset Density
+    if density_type == 2:
+        patt_LMH = pattern_LMH
+        salience = np.array([0.0, 0.0, 0.0], dtype=float)
+        num_notes_channel = np.sum(patt_LMH, axis=0)
+        num_notes = np.sum(patt_LMH)
+        rel_dens = np.array(num_notes_channel / num_notes, dtype=float)
+        salience = 1/rel_dens
+        channel_values = salience / np.sum(salience)
 
+        # now we have value per step
 
-    for i in range(16):
-        # Code from sync part of flattening algorithm above
-        if(pattern_LMH_count[0][i]>0 or pattern_LMH_count[1][i]>0 or pattern_LMH_count[2][i]>0):
-            note_values = [pattern_LMH_count[0][i], pattern_LMH_count[1][i], pattern_LMH_count[2][i]]
-            for note in range(len(note_values)): # this loop removes multi hits
-                if note_values[note]>=1:
-                    note_values[note] = 1
-            note_values_density_sync = np.array([note_values[0],note_values[1],note_values[2]], dtype=float)
-
-            if i>0:
-                if(i<len(pattern_LMH_count)):
-                    if(true_sync_salience[i-1]>true_sync_salience[i]): # if note is syncop
-                        if(pattern_LMH_count[0][i-1]==0):
-                            note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                        if(pattern_LMH_count[1][i-1]==0):
-                            note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                        if(pattern_LMH_count[2][i-1]==0):
-                            note_values_density_sync[2] += (note_values[2]*sync_strength[i])
-            """ if(i<15):
-                if(true_sync_salience[i]>true_sync_salience[i+1]): # if note is syncop
-                    if(pattern_LMH_count[0][i+1]==0):
-                        note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                    if(pattern_LMH_count[1][i+1]==0):
-                        note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                    if(pattern_LMH_count[2][i+1]==0):
-                        note_values_density_sync[2] += (note_values[2]*sync_strength[i])
-            if(i==15):
-                    if(pattern_LMH_count[0][0]==0):
-                        note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                    if(pattern_LMH_count[1][0]==0):
-                        note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                    if(pattern_LMH_count[2][0]==0):
-                        note_values_density_sync[2] += (note_values[2]*sync_strength[i]) """
-            if type==2:
-                note_values_density_sync[0] *= 3 # low
-                note_values_density_sync[1] *= 2 # mid
-            
-            note_values_density_sync += 15.0
-            note_values_density_sync /= 30.0 # witek math
-            arr[i] = np.sum(note_values_density_sync)
-
-    arr /= np.max(arr) # Normalize
-    return arr
-
-def metrical_strength(pattern, type):
-    arr = np.array([0.0 for x in range(16)], dtype=float)
-    pattern_LMH_count = get_lmh_counts(pattern)
-    pattern_LMH_count = np.array(pattern_LMH_count, dtype=float)
-    metric_sal_strength = [4,0,1,0, 2,0,1,0, 3,0,1,0, 2,0,1,0]
-
-    for i in range(16):
-        if(pattern_LMH_count[0][i]>0 or pattern_LMH_count[1][i]>0 or pattern_LMH_count[2][i]>0):
-            note_values = [pattern_LMH_count[0][i], pattern_LMH_count[1][i], pattern_LMH_count[2][i]]
-            for note in range(len(note_values)): # this loop removes multi hits
-                if note_values[note]>=1:
-                    note_values[note] = 1
-            note_values_density_sync_meter = np.array([note_values[0],note_values[1],note_values[2]], dtype=float)
-
-            # [2] Normalized Density Salience, Metric Salience, Syncopation Strength
-            if(i<15):
-                if(metric_sal_strength[i]>metric_sal_strength[i+1]): # if meter is reinforced
-                    if(pattern_LMH_count[0][i+1]==0):
-                        note_values_density_sync_meter[0] += (note_values[0]*metric_sal_strength[i])
-                    if(pattern_LMH_count[1][i+1]==0):
-                        note_values_density_sync_meter[1] += (note_values[1]*metric_sal_strength[i])
-                    if(pattern_LMH_count[2][i+1]==0):
-                        note_values_density_sync_meter[2] += (note_values[2]*metric_sal_strength[i])
-            if type==2:
-                note_values_density_sync_meter[0] *= 3 # low
-                note_values_density_sync_meter[1] *= 2 # mid
-            arr[i] = np.sum(note_values_density_sync_meter)
-
-    arr /= np.max(arr) # Normalize
-    return arr
-
-def relative_density(pattern, type):
-    arr = np.array([0.0 for x in range(16)], dtype=float)
-    pattern_LMH = get_LMH(pattern) # LOW MID HIGH
-    pattern_LMH_count=[[0 for x in range(len(pattern_LMH))] for y in range(3)]
-    total_count = [0.0 for x in range(4)]
-
-    # Count multi-hits in same channel on step
-    for i in range(len(pattern_LMH)):
-        for j in range(len(pattern_LMH[i])):
-            pattern_LMH_count[0][i] += 1 if pattern_LMH[i][j]==1 else 0 # LOW
-            pattern_LMH_count[1][i] += 1 if pattern_LMH[i][j]==2 else 0 # MID
-            pattern_LMH_count[2][i] += 1 if pattern_LMH[i][j]==3 else 0 # HIGH
-    for i in range(3): # GET TOTAL COUNT
-        total_count[i] = float(np.sum(pattern_LMH_count[i]))
-        total_count[3] += float(np.sum(pattern_LMH_count[i]))
-
-    # Initialize variables for flattening
-    density = [0.0 for x in range(3)]
-    salience = [0.0 for x in range(4)]
-    norm_salience = [0.0 for x in range(3)]
-    for i in range(3):
-        density[i] = 0.0 if total_count[3]==0 else float(total_count[i]/total_count[3])
-        salience[i] = 0.0 if density[i]<=0.0 else float(1/density[i])
-        salience[3] += salience[i]
-        #print(salience)
-    for i in range(3):
-        norm_salience[i] = salience[i]/salience[3]
+        if meter == 1: # basic meter
+            for note in range(len(pattern)):
+                for n in range(3):
+                    output_pattern[note] += meter_strength[note]*(patt_LMH[note][n]*channel_values[n])
     
-    # Loop through pattern
-    for i in range(len(pattern_LMH)):
-        if(pattern_LMH_count[0][i]>0 or pattern_LMH_count[1][i]>0 or pattern_LMH_count[2][i]>0):
-            note_values = [norm_salience[0]*pattern_LMH_count[0][i],norm_salience[1]*pattern_LMH_count[1][i],norm_salience[2]*pattern_LMH_count[2][i]]
-        else:
-            note_values=[0.0,0.0,0.0]
-        if type==2:
-            note_values[0] *= 3
-            note_values[1] *= 2
-        arr[i] = np.sum(note_values)
-    arr /= np.max(arr) # Norm
-    return arr
+        if syncopation_type == 1: # basic sync
+            for note in range(len(pattern)):
+                for n in range(len(patt_LMH[note])):
+                    if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync pos
+                        if patt_LMH[note][n]>0 and patt_LMH[(note+1)%len(pattern)][n]==0: # if sync note
+                            output_pattern[note] += sync_strength[note]*(patt_LMH[note][n]*channel_values[n]) # add note x sal.weighted value
+  
+        elif meter==0 and syncopation_type==0:
+            for n in range(len(pattern)):
+                patt_LMH *= channel_values
+            output_pattern += np.sum(patt_LMH[n][:], axis=0)
 
-def flatten_type(pattern, density_type, sync_type, meter, f_weight):
-    ###
-    # density types:
-    # 0 := 1 if a note
-    # 1 := norm. density
-    # 2 := rel. density
-
-    # sync types:
-    # 0 := none
-    # 1 := forwards
-    # 2 := backwards
-
-    # meter:
-    # 0 := none
-    # 1 := GTTM
-
-    arr = np.array([0.0 for x in range(16)], dtype=float)
-    note_values = np.array([1.0,1.0,1.0], dtype=float)
-    notevals = np.array([[0.0 for x in range(16)] for y in range(3)], dtype=float)
-
-    pattern_LMH = get_LMH(pattern) # LOW MID HIGH
-    pattern_LMH_count=[[0 for x in range(len(pattern_LMH))] for y in range(3)]
-    total_count = [0.0 for x in range(4)]
-    for i in range(len(pattern_LMH)):
-        for j in range(len(pattern_LMH[i])):
-            pattern_LMH_count[0][i] += 1 if pattern_LMH[i][j]==1 else 0 # LOW
-            pattern_LMH_count[1][i] += 1 if pattern_LMH[i][j]==2 else 0 # MID
-            pattern_LMH_count[2][i] += 1 if pattern_LMH[i][j]==3 else 0 # HIGH
-    for i in range(3): # GET TOTAL COUNT
-        total_count[i] = float(np.sum(pattern_LMH_count[i]))
-        total_count[3] += float(np.sum(pattern_LMH_count[i]))
-
-    # Initialize variables for flattening
-    density = [0.0 for x in range(3)]
-    salience = [0.0 for x in range(4)]
-    norm_salience = [0.0 for x in range(3)]
-    means = [0.0,0.0]
-    maxes = [0.0,0.0]
-    for i in range(3):
-        density[i] = 0.0 if total_count[3]==0 else float(total_count[i]/total_count[3])
-        salience[i] = 0.0 if density[i]<=0.0 else float(1/density[i])
-        salience[3] += salience[i]
-    for i in range(3):
-        norm_salience[i] = salience[i]/salience[3]
-
-
-    # Testing other onset density method
-    if density_type==1:
-        norm_salience = [3.0,2.0,1.0]
-    if density_type==0:
-        norm_salience = [1.0,1.0,1.0]
-
-    for i in range(16):
-        if(pattern_LMH_count[0][i]>0 or pattern_LMH_count[1][i]>0 or pattern_LMH_count[2][i]>0):
-            note_values = [norm_salience[0]*pattern_LMH_count[0][i],norm_salience[1]*pattern_LMH_count[1][i],norm_salience[2]*pattern_LMH_count[2][i]]
-
-        #### FREQ WEIGHT ####
-        if f_weight==1:
-            note_values[0] *= 3
-            note_values[1] *= 2
-        notevals[0][i] = note_values[0]
-        notevals[1][i] = note_values[1]
-        notevals[2][i] = note_values[2]
-        #arr[i] = np.sum(note_values)
+#-------------------------------------------------------------------------------------------
+# [3]                            
+#### Note Presence (mono)        
+    if density_type == 3:
+        mono_patt = np.sum(pattern_LMH, axis=1)
+        mono_patt = [1 if i>0 else 0 for i in mono_patt]
+        output_pattern = mono_patt
+        if meter == 1: # basic meter
+            for note in range(len(pattern)):
+                if mono_patt[note]==1:
+                    output_pattern[note] += meter_strength[note]
     
-    #####
-    # notevals has step & freq-wise note values [low,mid,high]
-    # arr has stepwise note values [sum]
+        if syncopation_type == 1: # basic sync
+            for note in range(len(pattern)):
+                if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync pos
+                    if mono_patt[note]>0 and mono_patt[(note+1)%len(pattern)]==0: # if sync note
+                        output_pattern[note] += sync_strength[note]
+        if syncopation_type == 2: # polysync
+            #print("TODO: poly sync")
+            # TODO
+            note=0
+        
 
-    
-    if sync_type==1: # Forward Syncopation (note preceding metrical rest)
-        true_sync_salience = [5,1,2,1, 3,1,2,1, 4,1,2,1, 3,1,2,1]
-        sync_strength = [0,1,0,2, 0,1,0,3, 0,1,0,2, 0,1,0,4]
-
-        for i in range(16):
-            # Code from sync part of flattening algorithm above
-            if(pattern_LMH_count[0][i]>0 or pattern_LMH_count[1][i]>0 or pattern_LMH_count[2][i]>0):
-                note_values = [notevals[0][i],notevals[1][i],notevals[2][i]]
-                note_values_density_sync = [notevals[0][i],notevals[1][i],notevals[2][i]]
-
-                """ if i>0:
-                    if(i<16):
-                        if(true_sync_salience[i-1]>true_sync_salience[i]): # if note is syncop
-                            if(pattern_LMH_count[0][i-1]==0):
-                                note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                            if(pattern_LMH_count[1][i-1]==0):
-                                note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                            if(pattern_LMH_count[2][i-1]==0):
-                                note_values_density_sync[2] += (note_values[2]*sync_strength[i]) """
-                if(i<15):
-                    if(true_sync_salience[i]>true_sync_salience[i+1]): # if note is syncop
-                        if(pattern_LMH_count[0][i+1]==0):
-                            note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                        if(pattern_LMH_count[1][i+1]==0):
-                            note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                        if(pattern_LMH_count[2][i+1]==0):
-                            note_values_density_sync[2] += (note_values[2]*sync_strength[i])
-                            
-                if(i==15):
-                        if(pattern_LMH_count[0][0]==0):
-                            note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                        if(pattern_LMH_count[1][0]==0):
-                            note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                        if(pattern_LMH_count[2][0]==0):
-                            note_values_density_sync[2] += (note_values[2]*sync_strength[i])
-
-                arr[i] += np.sum(note_values_density_sync)
-
-    if sync_type==2: # Backwards Syncopation (note following metrical rest)
-        true_sync_salience = [5,1,2,1, 3,1,2,1, 4,1,2,1, 3,1,2,1]
-        sync_strength = [0,4,0,1, 0,2,0,1, 0,3,0,1, 0,2,0,1]
-
-        for i in range(16):
-            # Code from sync part of flattening algorithm above
-            if(pattern_LMH_count[0][i]>0 or pattern_LMH_count[1][i]>0 or pattern_LMH_count[2][i]>0):
-                note_values = [notevals[0][i],notevals[1][i],notevals[2][i]]
-                note_values_density_sync = [notevals[0][i],notevals[1][i],notevals[2][i]]
-                if i>0:
-                    if(i<16):
-                        if(true_sync_salience[i-1]>true_sync_salience[i]): # if note is syncop
-                            if(pattern_LMH_count[0][i-1]==0):
-                                note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                            if(pattern_LMH_count[1][i-1]==0):
-                                note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                            if(pattern_LMH_count[2][i-1]==0):
-                                note_values_density_sync[2] += (note_values[2]*sync_strength[i])
-                """if(i<15):
-                    if(true_sync_salience[i]>true_sync_salience[i+1]): # if note is syncop
-                        if(pattern_LMH_count[0][i+1]==0):
-                            note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                        if(pattern_LMH_count[1][i+1]==0):
-                            note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                        if(pattern_LMH_count[2][i+1]==0):
-                            note_values_density_sync[2] += (note_values[2]*sync_strength[i])
-                            
-                if(i==15):
-                        if(pattern_LMH_count[0][0]==0):
-                            note_values_density_sync[0] += (note_values[0]*sync_strength[i])
-                        if(pattern_LMH_count[1][0]==0):
-                            note_values_density_sync[1] += (note_values[1]*sync_strength[i])
-                        if(pattern_LMH_count[2][0]==0):
-                            note_values_density_sync[2] += (note_values[2]*sync_strength[i])"""
-                arr[i] += np.sum(note_values_density_sync)
-
-    if meter==1:
-        metric_sal_strength = [4,0,1,0, 2,0,1,0, 3,0,1,0, 2,0,1,0]
-
-        for i in range(16):
-            if(pattern_LMH_count[0][i]>0 or pattern_LMH_count[1][i]>0 or pattern_LMH_count[2][i]>0):
-                note_values = [notevals[0][i],notevals[1][i],notevals[2][i]]
-                meter = [notevals[0][i],notevals[1][i],notevals[2][i]]
-
-                if(i<15):
-                    if(metric_sal_strength[i]>metric_sal_strength[i+1]): # if meter is reinforced
-                        if(pattern_LMH_count[0][i+1]==0):
-                            meter[0] += (note_values[0]*metric_sal_strength[i])
-                        if(pattern_LMH_count[1][i+1]==0):
-                            meter[1] += (note_values[1]*metric_sal_strength[i])
-                        if(pattern_LMH_count[2][i+1]==0):
-                            meter[2] += (note_values[2]*metric_sal_strength[i])
-                arr[i] += np.sum(meter)
-    arr /= np.max(arr) # Norm
-    
-    # Line below converts everything to semicontinuous
-    # arr = np.where(arr>=np.mean(arr), arr, 0.0)
-    return arr
+    output_pattern /= np.max(output_pattern) # norm
+    return output_pattern
+#-----------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------------
