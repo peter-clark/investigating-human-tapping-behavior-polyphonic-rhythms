@@ -155,8 +155,8 @@ def train_model(model, train_DL,test_DL, epochs, criterion, optimizer):
         
         # calculate average training loss
         train_loss /= n_samples
-        if ((ep+1) % 50 == 0):
-            print(f"Epoch {ep+1}/{epochs}, Train Loss: {train_loss:.4f}")
+        """ if ((ep+1) % 50 == 0):
+            print(f"Epoch {ep+1}/{epochs}, Train Loss: {train_loss:.4f}") """
         accuracy_train.append((1.0-train_loss)*100)
         
         model.eval()
@@ -175,23 +175,24 @@ def train_model(model, train_DL,test_DL, epochs, criterion, optimizer):
             test_loss += loss.item() * patterns.size(0)
 
         test_loss /= n_samples
-        if ((ep+1) % 50 == 0):
-            print(f"Epoch {ep+1}/{epochs}, Test Loss: {test_loss:.4f}")
+        if ((ep+1) % 100 == 0):
+            print(f"Epoch {ep+1}/{epochs}, Train Loss: {train_loss:.4f} Test Loss: {test_loss:.4f}")
         accuracy_test.append((1.0-test_loss)*100)
-        
+    print('-' * 20)    
     return model, np.average(accuracy_train), np.average(accuracy_test)
 
-def train_loop(model, train_DL, criterion, optimizer):
+def train_loop(model, train_DL, epochs, criterion, optimizer):
     size = len(train_DL.dataset)
-    for batch, (patterns, coords) in enumerate(train_DL):
-        # Compute prediction and loss
-        pred=model(patterns)
-        loss=criterion(pred,coords)
+    for ep in range(epochs):
+        for batch, (patterns, coords) in enumerate(train_DL):
+            # Compute prediction and loss
+            pred=model(patterns)
+            loss=criterion(pred,coords)
 
-        # Backprop
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
+            # Backprop
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 
         """ if batch % 25 == 0:
             _loss, current = loss.item(), (batch+1)*len(patterns)
@@ -203,12 +204,14 @@ def test_loop(model, test_DL, criterion):
     test_loss = 0.0
     correct = []
 
+    model.eval()
+
     with torch.no_grad():
         for patterns, coords in test_DL:
             pred=model(patterns)
             test_loss += criterion(pred,coords).item()
-            predicted = pred.detach().numpy()
-            c = coords.detach().numpy()
+            predicted = pred.cpu().detach().numpy()
+            c = coords.cpu().detach().numpy()
             for i in range(len(c)):
                 correct.append(EuclideanDistance(predicted[i], c[i]))
     
@@ -216,6 +219,7 @@ def test_loop(model, test_DL, criterion):
     correct_avg = np.average(correct)
     
     #print(f"Test Error: EuclidDist:{correct_avg:.4f}, Avg loss: {test_loss:.4f}")
+    return correct, test_loss
 
 def plot_points_with_lines(data1, data2):
     """ plt.scatter([point[0] for point in data1], [point[1] for point in data1], marker='.', color='blue')

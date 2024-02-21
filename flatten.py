@@ -156,13 +156,59 @@ def flat(pattern, density_type, meter, syncopation_type):
                 if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync pos
                     if mono_patt[note]>0.0 and mono_patt[(note+1)%len(pattern)]==0: # if sync note
                         output_pattern[note] += sync_strength[note]
-        if syncopation_type == 2: # polysync
-            #print("TODO: poly sync")
-            # TODO
-            note=0
         
+        if syncopation_type == 2: # polysync
+            salience_w= [0,-3,-2,-3,-1,-3,-2,-3,-1,-3,-2,-3,-1,-3,-2,-3] #metric profile as described by witek
+            salience_w_nxt = np.roll(salience_w, 1)
+            poly_sync_strength = np.abs(salience_w-salience_w_nxt)
+            
+            events = np.transpose(pattern_LMH) #(3,16)
+            events_next = np.roll(events, 1, axis=1) # shift one right
 
-    output_pattern /= np.max(output_pattern) # norm
+            for note in range(len(pattern)):
+                weight=1
+                polysync_val=1
+                nxt = (note+1)%len(pattern)
+                if (events!=events_next).any() and salience_w[nxt]>=salience_w[note]: # different events and is sync pos
+                        
+                    ## 3 stream syncopation
+                    # low followed by mid high
+                    if events[0][note]>0.99 and (events_next[1][note]>0.99 and events_next[2][note]>0.99):
+                        weight=2
+                        polysync_val = weight + poly_sync_strength[note]
+                    
+                    # (mid before low high)
+                    if events[1][note]>0.99 and (events_next[0][note]>0.99 and events_next[2][note]>0.99):
+                        weight=1
+                        polysync_val = weight + poly_sync_strength[note]
+                    
+                    ## 2 stream
+                    # low or mid followed by high(no low no mid) 
+                    if (events[0][note]>0.99 or events[1][note]>0.99) and \
+                        (events_next[0][note]<0.01 and events_next[1][note]<0.01 and events_next[2][note]>0.99):
+                        
+                        weight=5
+                        polysync_val = weight + poly_sync_strength[note]
+                    
+                    # low (alone) followed by mid (alone) (Gomez-Marin et al. 2020)
+                    if (events[0][note]>0.99 and events[1][note]<0.01 and \
+                        events[2][note]<0.01) and (events_next[0][note]<0.01 and events_next[1][note]>0.99 and events_next[2][note]<0.01):
+                        
+                        weight=2
+                        polysync_val = weight + poly_sync_strength[note]
+                    
+                    # mid (alone) followed by low (alone) (Gomez-Marin et al. 2020)
+                    if (events[0][note]<0.01 and events[1][note]>0.99 and events[2][note]<0.01) and \
+                        (events_next[0][note]>0.99 and events_next[1][note]<0.01 and events_next[2][note]<0.01):
+                        
+                        weight=2
+                        polysync_val = weight + poly_sync_strength[note]
+                    
+                    # multiply by poly syncopation value. this is doing 1*polysync_val
+                    # iff the note exists and is syncopation. Otherwise multilpies by 1
+                    output_pattern[note]*=polysync_val 
+        
+    output_pattern /= np.max(output_pattern) if np.max(output_pattern)>0.0 else 1 # norm
     return output_pattern
 #-----------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------
