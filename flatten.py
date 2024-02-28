@@ -60,7 +60,7 @@ def flat(pattern, density_type, meter, syncopation_type):
     step_values = np.array([0.0, 0.0, 0.0], dtype=float)
 
     sync_strength = [0,1,0,2, 0,1,0,3, 0,1,0,2, 0,1,0,4]
-    meter_strength = [4,0,1,0, 2,0,1,0, 3,0,1,0, 2,0,1,0]
+    meter_strength = [3,0,1,0, 2,0,1,0, 2,0,1,0, 2,0,1,0]
 #-----------------------------------------------------------------------------------------------
 # [0]
 #### Onset Density / Meter / Syncopation
