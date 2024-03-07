@@ -119,41 +119,6 @@ def flat(pattern, density_type, meter, syncopation_type):
             output_pattern[note]+=np.sum(step)    
         output_pattern /= np.max(output_pattern)
 
-        """ patt_LMH = pattern_LMH
-        for note in range(len(pattern)):
-            for ch in range(3):
-                patt_LMH[note][ch]=1.0 if patt_LMH[note][ch]>0.0 else 0.0
-        for note in range(16):
-            patt_LMH[note][0] *= 3.0 # low x3 weight
-            patt_LMH[note][1] *= 2.0 # mid x2 weight
-        step_values = [3.0,2.0,1.0]
-        #np.sum(patt_LMH, axis=0) / np.max(np.sum(patt_LMH, axis=0))
-        patt_LMH = np.sum(pattern_LMH, axis=1)/np.max(np.sum(pattern_LMH, axis=1))
-        
-        for note in range(len(pattern)): # freq weig ons den
-            for n in range(3):
-                if pattern_LMH[note][n]>0.01:
-                    output_pattern[note] += pattern_LMH[note][n]*step_values[n]
-
-        if meter == 1: # basic meter
-            for note in range(len(pattern)):
-                copy=patt_LMH.copy()
-                if meter_strength[note]>meter_strength[(note+1)%16]:
-                    for n in range(3):
-                        if pattern_LMH[note][n]>0.0:
-                                copy+=meter_strength[note]*step_values[n]
-                output_pattern[note] += copy[note]
-        
-        if syncopation_type == 1: # mono sync
-            for note in range(len(pattern)):
-                copy=patt_LMH.copy()
-                if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync
-                    for n in range(3):
-                        #if np.any(pattern_LMH[note][x]>0.0 and pattern_LMH[(note+1)%len(pattern)][x]<0.01 for x in range(3)): 
-                        copy[note] += sync_strength[note]*step_values[n]
-                output_pattern[note] += copy[note] # add to one sync value if any channel is sync """
-        
-
 #-------------------------------------------------------------------------------------------
 # [2]                            
 #### Pattern Relative Onset Density
@@ -190,24 +155,6 @@ def flat(pattern, density_type, meter, syncopation_type):
 
             output_pattern[note]+=np.sum(step)    
         output_pattern /= np.max(output_pattern)
-    """         #patt_LMH = np.sum(pattern_LMH, axis=1)/np.max(np.sum(pattern_LMH, axis=1))
-        for note in range(len(pattern)): # freq weig ons den
-            for n in range(3):
-                if pattern_LMH[note][n]>0.01:
-                    output_pattern[note] += pattern_LMH[note][n]*channel_values[n]
-
-        if meter == 1: # basic meter
-            for note in range(len(pattern)):
-                for n in range(3):
-                    output_pattern[note] += meter_strength[note]*(patt_LMH[note][n]*channel_values[n])
-    
-        if syncopation_type == 1: # basic sync
-            for note in range(len(pattern)):
-                for n in range(len(patt_LMH[note])):
-                    if sync_strength[note]>sync_strength[(note+1)%len(pattern)]: # if sync pos
-                        if patt_LMH[note][n]>0.0 and patt_LMH[(note+1)%len(pattern)][n]==0.0: # if sync note
-                            output_pattern[note] += sync_strength[note]*(patt_LMH[note][n]*channel_values[n]) # add note x sal.weighted value
-    """                
 
 #-------------------------------------------------------------------------------------------
 # [3]                            
