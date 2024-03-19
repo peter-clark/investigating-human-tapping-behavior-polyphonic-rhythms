@@ -203,7 +203,7 @@ def test_loop(model, test_DL, criterion):
     num_batches = len(test_DL)
     test_loss = 0.0
     correct = []
-
+    pred_coords = []
     model.eval()
 
     with torch.no_grad():
@@ -211,15 +211,25 @@ def test_loop(model, test_DL, criterion):
             pred=model(patterns)
             test_loss += criterion(pred,coords).item()
             predicted = pred.cpu().detach().numpy()
+            pred_coords.append(predicted)
             c = coords.cpu().detach().numpy()
             for i in range(len(c)):
                 correct.append(EuclideanDistance(predicted[i], c[i]))
-    
     test_loss /= num_batches
     correct_avg = np.average(correct)
     
     #print(f"Test Error: EuclidDist:{correct_avg:.4f}, Avg loss: {test_loss:.4f}")
-    return correct, test_loss
+    return correct, test_loss, pred_coords
+
+def get_predicted_coords(patterns,coords,model):
+    predicted=[]
+    distance=[]
+    for i in range(len(patterns)):
+        row = torch.Tensor(patterns[i]).float()
+        pred = model(row)
+        predicted.append(pred.detach().numpy())
+        distance.append(EuclideanDistance(predicted[i],coords[i]))
+    return predicted, distance
 
 def plot_points_with_lines(data1, data2):
     """ plt.scatter([point[0] for point in data1], [point[1] for point in data1], marker='.', color='blue')
@@ -229,23 +239,40 @@ def plot_points_with_lines(data1, data2):
     num_points = min(len(data1), len(data2))
     for i in range(num_points):
         distance = EuclideanDistance(data1[i], data2[i])
+        
         x.append(distance)
-        if distance < 0.1:    
-            plt.plot([np.array(data1[i])[0], np.array(data2[i])[0]],
+        if distance >-0.1:    
+            """ plt.plot([np.array(data1[i])[0], np.array(data2[i])[0]],
                      [np.array(data1[i])[1], np.array(data2[i])[1]],
-                     color='dimgrey', linewidth=0.4, alpha=0.7)
-            plt.scatter(data1[i][0], data1[i][1], marker='2', color='red')
-            plt.scatter(data2[i][0], data2[i][1], marker='.', color='black')
-        """ else: 
-                plt.scatter(data1[i][0], data1[i][1], marker='x', color='grey', alpha=0.6)
-                plt.scatter(data2[i][0], data2[i][1], marker='.', color='grey', alpha=0.6) """
+                     color='dimgrey', linewidth=1-(distance+distance), alpha=1-(distance+distance)) """
+            """ if distance >0.1:
+                a = 1-(distance+distance) if 1-(distance+distance)>0.0 else 0.1
+                line,=plt.plot([np.array(data1[i])[0], np.array(data2[i])[0]],
+                     [np.array(data1[i])[1], np.array(data2[i])[1]],
+                     color='dimgrey', linewidth=1.5-(distance+distance), alpha=a)
+                alg=plt.scatter(data1[i][0], data1[i][1], marker='x', color='black', alpha=0.5)
+                rs=plt.scatter(data2[i][0], data2[i][1], marker='.', color='black', alpha=0.5)  """   
+            if distance <=0.1:
+                line2,=plt.plot([np.array(data1[i])[0], np.array(data2[i])[0]],
+                     [np.array(data1[i])[1], np.array(data2[i])[1]],
+                     color='grey', linewidth=0.7, alpha=0.7)
+                alg2=plt.scatter(data1[i][0], data1[i][1], marker='+', color='dimgrey', alpha=1)
+                rs2=plt.scatter(data2[i][0], data2[i][1], marker='.', color='dimgrey', alpha=1)
+            if distance >0.1:
+                """ plt.plot([np.array(data1[i])[0], np.array(data2[i])[0]],
+                     [np.array(data1[i])[1], np.array(data2[i])[1]],
+                     color='dimgrey', linewidth=0.5, alpha=0.7) """
+                #plt.scatter(data1[i][0], data1[i][1], marker='x', color='grey', alpha=0.7)
+                inc=plt.scatter(data2[i][0], data2[i][1], marker='.', color='grey', alpha=0.4)
             
     #plt.hist(x, bins=20)
     plt.gca().set_aspect('equal')
     plt.setp(plt.gca().get_xticklabels(), visible=False)
     plt.setp(plt.gca().get_yticklabels(), visible=False)
-    plt.title('OnsDen_fW Predictions in Rhythm Space')
-    plt.legend(["d<0.1",'OnsDen_fW', 'Rhythm Space'], loc='upper right', fontsize='small')
+    plt.gca().set_xlim([-0.1,1.1])
+    plt.gca().set_ylim([-0.1,1.1])
+    #plt.legend([line,alg,rs],["distance based opacity",'Freq. Weighted Onset Density', 'Rhythm Space Embedding'], loc='upper right', fontsize='small')
+    plt.legend([line2,alg2,rs2,inc],["Prediction-Target Pair, error <= 0.1",'Predictions, error <= 0.1', 'Target Positions, error<=0.1','Target Positions, error>0.1',], loc='upper right', fontsize='small')
 
     plt.show()
 
