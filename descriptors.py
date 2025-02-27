@@ -91,6 +91,7 @@ GM_dict={
     79:['Open Cuica','high',79,'',-1, 45,63,42],
     80:['Mute Triangle','high',80,'',-1, 37,75,42],
     81:['Open Triangle','high',81,'',-1, 37,75,42],
+	87:['Closed Triangle','high',87,'',-1, 37,75,42],
     }
 
 def event_to_8number(midi_notes):

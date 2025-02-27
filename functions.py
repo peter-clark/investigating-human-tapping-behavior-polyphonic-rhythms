@@ -74,6 +74,7 @@ GM_dict={
     79:['Open Cuica','high',79,'',-1, 45,63,42],
     80:['Mute Triangle','high',80,'',-1, 37,75,42],
     81:['Open Triangle','high',81,'',-1, 37,75,42],
+	87:['Closed Triangle','high',87,'',-1, 37,75,42],
     }
 
 def midipattern2pattlist(pattern_name, instruments):
@@ -114,7 +115,12 @@ def midipattern2pattlist(pattern_name, instruments):
 
  				#remap msg.note by demand
  				#print ("note", msg.note)
-				midinote = GM_dict[msg.note][column]
+				if msg.note in GM_dict:
+					midinote = GM_dict[msg.note][column]
+				else:
+					print(f"Warning: MIDI note {msg.note} not found in GM_dict")
+					continue 
+				#midinote = GM_dict[msg.note][column]
 
 				pattern.append((int(accumulated/sixteenth),midinote)) # step, note
 			elif msg.type=="note_off":
